@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="Control personal de cuentas, efectivo, gastos y presupuesto.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Control Financiero Pro 3.1</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#0b1220;--panel:#121d30;--panel2:#17243a;--line:#263650;
+  --text:#eef4ff;--muted:#91a2bd;--blue:#5795ff;--green:#35d39a;
+  --red:#ff7185;--amber:#f5bd57;--purple:#a78bfa;
+  --shadow:0 18px 45px rgba(0,0,0,.22);--radius:18px
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 15% 0%,#142748 0,transparent 35%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.app{max-width:1380px;margin:auto;padding:28px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#3979f6,#35d39a);display:grid;place-items:center;font-size:22px;box-shadow:0 8px 24px #3979f644}
+.brand h1{font-size:19px;margin:0;letter-spacing:.2px}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.top-actions{display:flex;gap:10px;align-items:center}
+.pill{border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}
+.btn{border:0;border-radius:12px;padding:11px 15px;font-weight:700;color:white;background:var(--blue);box-shadow:0 8px 18px #3979f633}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.secondary{background:#22334f;border:1px solid var(--line);box-shadow:none;color:var(--text)}
+.btn.danger{background:#4a2431;color:#ff9aa8;box-shadow:none}
+.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);gap:20px}
+.maincol,.sidecol{display:grid;gap:20px;align-content:start}
+.panel{background:linear-gradient(160deg,#152238,#111b2d);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);min-width:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.panel h2{font-size:16px;margin:0}.sub{font-size:12px;color:var(--muted);margin:4px 0 0}
+.hero{background:linear-gradient(115deg,#1b3c71,#174c58);border:1px solid #37618b;border-radius:22px;padding:24px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.hero:after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;background:#ffffff0c;right:-75px;top:-110px}
+.hero-label{font-size:12px;color:#c2d9ff;letter-spacing:1.1px;text-transform:uppercase}
+.hero-amount{font-size:clamp(30px,5vw,43px);font-weight:800;letter-spacing:-1.5px;margin:6px 0 14px}
+.hero-foot{display:flex;gap:24px;flex-wrap:wrap;color:#d7e7ff;font-size:12px}
+.hero-foot strong{display:block;color:white;font-size:15px;margin-top:2px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-top:15px}
+.metric{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0}
+.metric-top{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;gap:8px}
+.metric-icon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:#263c5e;color:#8cb8ff}
+.metric strong{display:block;font-size:21px;margin-top:10px;letter-spacing:-.5px;overflow-wrap:anywhere}
+.metric small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.green{color:var(--green)!important}.red{color:var(--red)!important}.amber{color:var(--amber)!important}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.account{padding:16px;border-radius:15px;border:1px solid var(--line);background:#101a2b}
+.account-row{display:flex;align-items:center;gap:10px}.account-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:18px;background:#3a2d1c;color:#ffc66d}
+.account:nth-child(2) .account-icon{background:#153d36;color:#6ee7b7}
+.account h3{font-size:13px;margin:0}.account p{font-size:11px;color:var(--muted);margin:2px 0 0}
+.account strong{display:block;font-size:23px;margin-top:13px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}
+label{font-size:12px;color:#b4c3da}
+input,select,textarea{width:100%;background:#0c1627;color:var(--text);border:1px solid #30415d;border-radius:11px;padding:11px 12px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #5795ff20}
+textarea{min-height:76px;resize:vertical}
+.help{font-size:11px;color:var(--muted);margin-top:2px}
+.form-actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.notice{border:1px solid #39577d;background:#152a46;color:#c7ddff;padding:11px 13px;border-radius:12px;font-size:12px;margin:12px 0}
+.notice.warn{border-color:#735b31;background:#302719;color:#f6d28e}
+.budget-list{display:grid;gap:15px}
+.budget-item{display:grid;gap:7px}
+.budget-title{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+.budget-title span:last-child{color:var(--muted)}
+.track{height:8px;background:#263650;border-radius:99px;overflow:hidden}
+.fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#5795ff,#35d39a)}
+.fill.over{background:var(--red)}
+.transaction-list{display:grid;gap:9px;max-height:490px;overflow:auto;padding-right:3px}
+.tx{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0f1a2b;border:1px solid #253650;border-radius:13px;padding:12px}
+.tx-left{display:flex;align-items:center;gap:11px;min-width:0}
+.tx-icon{width:36px;height:36px;border-radius:11px;background:#263a58;display:grid;place-items:center;flex-shrink:0}
+.tx-title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.tx-right{text-align:right;white-space:nowrap}.tx-amount{font-weight:800;font-size:14px}.tx-actions{display:flex;gap:5px;margin-top:4px;justify-content:flex-end}
+.mini{border:0;background:transparent;color:var(--muted);font-size:11px;padding:2px 4px}.mini:hover{color:white}
+.filters{display:flex;gap:8px;flex-wrap:wrap}.filters input,.filters select{max-width:180px;padding:8px 10px;font-size:12px}
+.empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:13px}
+.hidden{display:none!important}
+.footer-note{color:var(--muted);font-size:11px;text-align:center;margin:18px 0 4px}
+@media(max-width:950px){.layout{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.app{padding:16px}.topbar{align-items:flex-start}.top-actions .pill{display:none}.two-col,.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.cards{gap:9px}.metric{padding:13px}.metric strong{font-size:18px}.panel{padding:16px}.hero{padding:19px}.hero-foot{gap:14px}}
+
+.tx-actions .mini.edit{color:#8db9ff}
+.tx-actions .mini.delete{color:#ff9aa8}
+#cancelEdit{display:none}
+.sync-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.sync-grid .field.full{grid-column:1/-1}
+.sync-status{font-size:12px;color:var(--muted);margin-top:10px;min-height:18px}
+.sync-status.ok{color:var(--green)}.sync-status.err{color:var(--red)}
+@media(max-width:580px){
+  .topbar{flex-direction:column}
+  .top-actions{width:100%;flex-wrap:wrap}
+  .top-actions .btn{flex:1}
+  .tx{align-items:flex-start;padding:10px}
+  .tx-actions .mini{padding:6px 5px}
+  .form-actions .btn{flex:1}
+  .sync-grid{grid-template-columns:1fr}
+  .sync-grid .field.full{grid-column:auto}
+  input,select,textarea{font-size:16px}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo">↗</div><div><h1>Control Financiero <span style="color:#75a9ff">Pro 3.1</span></h1><p>Tu dinero, cada movimiento bajo control</p></div></div>
+    <div class="top-actions"><span class="pill">● Datos guardados en este dispositivo</span><button class="btn secondary" id="exportBtn">Exportar CSV</button></div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-label">Patrimonio registrado</div>
+    <div class="hero-amount" id="netWorth">$0.00</div>
+    <div class="hero-foot">
+      <div>Dinero en cuentas<strong id="bankTotal">$0.00</strong></div>
+      <div>Efectivo disponible<strong id="cashTotal">$0.00</strong></div>
+      <div>Gastos del mes<strong id="monthExpenses">$0.00</strong></div>
+    </div>
+  </section>
+
+  <section class="cards">
+    <div class="metric"><div class="metric-top">Ingresos del mes <span class="metric-icon">↙</span></div><strong class="green" id="incomeMetric">$0.00</strong><small>Dinero nuevo registrado</small></div>
+    <div class="metric"><div class="metric-top">Gastos del mes <span class="metric-icon">↗</span></div><strong class="red" id="expenseMetric">$0.00</strong><small>Tarjeta + efectivo</small></div>
+    <div class="metric"><div class="metric-top">Transferencias externas <span class="metric-icon">⇢</span></div><strong id="externalMetric">$0.00</strong><small>Registradas aparte del gasto</small></div>
+    <div class="metric"><div class="metric-top">Presupuesto restante <span class="metric-icon">◷</span></div><strong id="remainingMetric">$0.00</strong><small>Según presupuesto general</small></div>
+  </section>
+
+  <div class="layout" style="margin-top:20px">
+    <main class="maincol">
+      <section class="panel">
+        <div class="panel-head"><div><h2>Mis cuentas y efectivo</h2><p class="sub">Saldos calculados a partir de tus movimientos</p></div><span class="pill">USD · Ecuador</span></div>
+        <div class="two-col">
+          <div class="account"><div class="account-row"><div class="account-icon">🏦</div><div><h3>Banco Pichincha</h3><p>Cuenta principal</p></div></div><strong id="pichinchaBalance">$0.00</strong></div>
+          <div class="account"><div class="account-row"><div class="account-icon">🐷</div><div><h3>Cooperativa Atuntaqui</h3><p>Cuenta de ahorros</p></div></div><strong id="atuntaquiBalance">$0.00</strong></div>
+          <div class="account"><div class="account-row"><div class="account-icon">👛</div><div><h3>Billetera de efectivo</h3><p>Retiros menos consumos</p></div></div><strong id="cashBalance">$0.00</strong></div>
+          <div class="account"><div class="account-row"><div class="account-icon">📊</div><div><h3>Presupuesto mensual</h3><p id="budgetCaption">Límite general</p></div></div><strong id="budgetBalance">$180.00</strong></div>
+        </div>
+      </section>
+
+      <section class="panel" id="movementPanel">
+        <div class="panel-head"><div><h2>Registrar movimiento</h2><p class="sub">Depósitos, retiros, transferencias y consumos</p></div><span class="pill">Nuevo registro</span></div>
+        <form id="movementForm">
+          <div class="form-grid">
+            <div class="field full"><label for="kind">Tipo de movimiento</label>
+              <select id="kind" required>
+                <option value="income">Ingreso nuevo</option>
+                <option value="deposit">Depósito de dinero nuevo</option>
+                <option value="withdrawal">Retiro de efectivo</option>
+                <option value="internal">Transferencia entre mis cuentas</option>
+                <option value="external">Transferencia a otra cuenta / persona</option>
+                <option value="cardExpense">Compra o pago con tarjeta</option>
+                <option value="cashExpense">Consumo en efectivo</option>
+              </select>
+            </div>
+            <div class="field"><label for="amount">Monto (USD)</label><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></div>
+            <div class="field"><label for="date">Fecha</label><input id="date" type="date" required></div>
+            <div class="field" id="accountField"><label for="account">Cuenta de origen / destino</label><select id="account"><option value="pichincha">Banco Pichincha</option><option value="atuntaqui">Cooperativa Atuntaqui</option></select></div>
+            <div class="field hidden" id="destinationField"><label for="destination">Cuenta de destino</label><select id="destination"><option value="atuntaqui">Cooperativa Atuntaqui</option><option value="pichincha">Banco Pichincha</option></select></div>
+            <div class="field hidden" id="categoryField"><label for="category">Categoría del gasto</label><select id="category"></select></div>
+            <div class="field hidden" id="sourceField"><label for="source">Origen del dinero nuevo</label><select id="source"><option>Sueldo / ganancia semanal</option><option>Ingreso extra</option><option>Dinero recibido</option><option>Otro ingreso</option></select></div>
+            <div class="field hidden" id="beneficiaryField"><label for="beneficiary">Banco / beneficiario</label><input id="beneficiary" placeholder="Ej. Banco Guayaquil · Juan"></div>
+            <div class="field hidden" id="reasonField"><label for="reason">Motivo o referencia</label><input id="reason" placeholder="Ej. Pago, ayuda, transferencia propia..."></div>
+            <div class="field full"><label for="description">Descripción (opcional)</label><input id="description" placeholder="Añade un detalle para recordar este movimiento"></div>
+          </div>
+          <div class="notice" id="formNotice">Los ingresos y depósitos nuevos aumentan tu saldo y se contabilizan como ingreso del mes.</div>
+          <div class="form-actions"><button class="btn" type="submit" id="submitMovement">Guardar movimiento</button><button class="btn secondary" type="reset" id="resetBtn">Limpiar</button><button class="btn danger" type="button" id="cancelEdit">Cancelar edición</button></div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Historial de movimientos</h2><p class="sub">Puedes filtrar, revisar, editar y eliminar registros</p></div></div>
+        <div class="filters" style="margin-bottom:13px"><input id="search" placeholder="Buscar movimiento..."><select id="filterType"><option value="all">Todos los tipos</option><option value="income">Ingresos</option><option value="deposit">Depósitos nuevos</option><option value="withdrawal">Retiros</option><option value="internal">Entre mis cuentas</option><option value="external">Transferencias externas</option><option value="cardExpense">Compras con tarjeta</option><option value="cashExpense">Consumos en efectivo</option></select><input type="month" id="filterMonth"></div>
+        <div class="transaction-list" id="transactionList"><div class="empty">Todavía no hay movimientos registrados.</div></div>
+      </section>
+    </main>
+
+    <aside class="sidecol">
+      <section class="panel">
+        <div class="panel-head"><div><h2>Presupuesto mensual</h2><p class="sub">Control general y por categoría</p></div></div>
+        <div class="field"><label for="generalBudget">Límite general del mes (USD)</label><div style="display:flex;gap:8px"><input id="generalBudget" type="number" min="1" step=".01" value="180"><button class="btn" id="saveBudget" type="button">Guardar</button></div></div>
+        <div class="notice" id="budgetNotice">Los gastos de tarjeta y efectivo se descuentan del presupuesto. Los retiros y transferencias no se cuentan como consumo.</div>
+        <div class="budget-list" id="budgetList"></div>
+        <div style="border-top:1px solid var(--line);margin-top:17px;padding-top:15px">
+          <h2 style="font-size:13px;margin-bottom:10px">Editar límites por categoría</h2>
+          <div class="form-grid" id="categoryBudgets"></div>
+          <button class="btn secondary" id="saveCategoryBudgets" type="button" style="width:100%;margin-top:12px">Guardar límites</button>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Cómo se contabiliza</h2><p class="sub">Para evitar duplicar ingresos o gastos</p></div></div>
+        <div class="notice">💵 <b>Retiro:</b> sale del banco y entra a tu billetera. No es un gasto.</div>
+        <div class="notice">🛍️ <b>Consumo:</b> reduce efectivo o cuenta bancaria y suma al presupuesto de su categoría.</div>
+        <div class="notice">🔁 <b>Transferencia propia:</b> mueve dinero entre cuentas; no cambia tu patrimonio.</div>
+        <div class="notice">↗️ <b>Transferencia externa:</b> queda registrada con beneficiario y motivo; no se clasifica automáticamente como consumo.</div>
+        <div class="notice">➕ <b>Depósito nuevo:</b> aumenta la cuenta y se registra como dinero nuevo recibido.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Sincronización entre dispositivos</h2><p class="sub">Conecta tu espacio privado en la nube</p></div></div>
+        <div class="notice">Configura una vez tu proyecto de Supabase. Usa la misma cuenta de acceso en tu computadora y Android para compartir los mismos datos.</div>
+        <div class="sync-grid">
+          <div class="field full"><label for="supabaseUrl">URL del proyecto Supabase</label><input id="supabaseUrl" type="url" placeholder="https://tu-proyecto.supabase.co" autocomplete="url"></div>
+          <div class="field full"><label for="supabaseKey">Clave pública (anon / publishable)</label><input id="supabaseKey" type="password" placeholder="Clave pública de tu proyecto" autocomplete="off"></div>
+          <div class="field"><label for="syncEmail">Correo de acceso</label><input id="syncEmail" type="email" placeholder="tu correo" autocomplete="username"></div>
+          <div class="field"><label for="syncPassword">Contraseña</label><input id="syncPassword" type="password" placeholder="Contraseña de tu cuenta" autocomplete="current-password"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn secondary" type="button" id="saveCloudConfig">Guardar configuración</button>
+          <button class="btn" type="button" id="connectCloud">Entrar / crear cuenta</button>
+          <button class="btn secondary" type="button" id="syncNow">Sincronizar ahora</button>
+          <button class="btn danger" type="button" id="disconnectCloud">Cerrar sesión</button>
+        </div>
+        <div class="sync-status" id="syncStatus">Todavía no has conectado una cuenta en la nube.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Respaldo de datos</h2></div></div>
+        <p class="sub" style="margin-bottom:12px">Tus datos se guardan en este navegador. Descarga una copia periódicamente.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn secondary" id="backupBtn">Descargar respaldo JSON</button><label class="btn secondary" for="restoreFile" style="cursor:pointer">Importar respaldo</label><input id="restoreFile" type="file" accept=".json,application/json" class="hidden"></div>
+      </section>
+    </aside>
+  </div>
+  <p class="footer-note">Control Financiero Pro 3.1 · Datos locales con sincronización privada opcional. No se conecta automáticamente con los bancos.</p>
+</div>
+
+<script>
+const STORAGE_KEY='finanzas_pro_v3';
+const categories=[
+ ['Instituto','Instituto'],['Pensión alimenticia','Pensión alimenticia'],['Servicios','Servicios'],['Pasajes','Pasajes'],['Suscripciones','Suscripciones'],['Recargas','Recargas celulares'],['Cuidado personal','Corte de pelo'],['Comida','Comidas por afuera'],['Gustitos','Gustitos'],['Otros','Otros']
+];
+const defaultState={
+ accounts:{pichincha:250,atuntaqui:0},cash:0,budget:180,
+ categoryBudgets:{'Instituto':40,'Pensión alimenticia':0,'Servicios':30,'Pasajes':35,'Suscripciones':15,'Recargas celulares':10,'Corte de pelo':10,'Comidas por afuera':30,'Gustitos':10,'Otros':0},
+ transactions:[]
+};
+let state=loadState();
+let editingId=null;
+const $=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat('es-EC',{style:'currency',currency:'USD'}).format(Number(n)||0);
+const today=()=>{const d=new Date();const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);return local.toISOString().slice(0,10);};
+$('date').value=today();
+function loadState(){
+ try{
+  const raw=localStorage.getItem(STORAGE_KEY);
+  if(raw){const x=JSON.parse(raw);return {...structuredClone(defaultState),...x,accounts:{...defaultState.accounts,...x.accounts},categoryBudgets:{...defaultState.categoryBudgets,...x.categoryBudgets},transactions:Array.isArray(x.transactions)?x.transactions:[]};}
+  // Migración de la versión anterior: conserva saldo inicial y movimientos históricos.
+  const old=JSON.parse(localStorage.getItem('finanzas_pro_v2')||'null');
+  if(old){
+   const migrated={...structuredClone(defaultState),accounts:{pichincha:Number(old.pichinchaBase)||250,atuntaqui:0},budget:Number(old.limitePresupuesto)||180,transactions:[]};
+   (old.movimientos||[]).forEach(m=>{
+    const amount=Number(m.monto)||0;if(!amount)return;
+    if(m.tipo==='ingreso_semanal'||m.tipo==='ingreso_extra')migrated.transactions.push({id:crypto.randomUUID(),kind:'income',amount,account:'pichincha',date:today(),description:m.tipo==='ingreso_semanal'?'Ganancia semanal':'Ingreso extra',source:'Migrado de versión anterior'});
+    else if(m.tipo==='ahorro_manual')migrated.transactions.push({id:crypto.randomUUID(),kind:'internal',amount,account:'pichincha',destination:'atuntaqui',date:today(),description:'Ahorro a Atuntaqui (migrado)'});
+    else if(m.tipo.startsWith('gasto_')){const map={gasto_instituto:'Instituto',gasto_pension:'Pensión alimenticia',gasto_tv:'Servicios',gasto_pasajes:'Pasajes',gasto_netflix:'Suscripciones',gasto_recargas:'Recargas celulares',gasto_corte:'Corte de pelo',gasto_comida:'Comidas por afuera',gasto_gustito:'Gustitos'};migrated.transactions.push({id:crypto.randomUUID(),kind:'cardExpense',amount,account:'pichincha',category:map[m.tipo]||'Otros',date:today(),description:'Movimiento migrado del historial anterior'});}
+   });
+   localStorage.setItem(STORAGE_KEY,JSON.stringify(migrated));return migrated;
+  }
+ }catch(e){console.warn('No se pudieron leer los datos guardados',e);}
+ return structuredClone(defaultState);
+}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(typeof scheduleCloudSave==='function')scheduleCloudSave();}
+function monthKey(d){return (d||'').slice(0,7);}
+function currentMonth(){return today().slice(0,7);}
+function monthTx(){return state.transactions.filter(t=>monthKey(t.date)===currentMonth());}
+function totals(){
+ let p=Number(state.accounts.pichincha)||0,a=Number(state.accounts.atuntaqui)||0,c=Number(state.cash)||0;
+ let income=0,expense=0,external=0;
+ state.transactions.forEach(t=>{
+  const n=Number(t.amount)||0;
+  if(t.kind==='income'||t.kind==='deposit'){if(t.account==='pichincha')p+=n;else a+=n;income+=n;}
+  if(t.kind==='withdrawal'){if(t.account==='pichincha')p-=n;else a-=n;c+=n;}
+  if(t.kind==='internal'){if(t.account==='pichincha')p-=n;else a-=n;if(t.destination==='pichincha')p+=n;else a+=n;}
+  if(t.kind==='external'){if(t.account==='pichincha')p-=n;else a-=n;external+=n;}
+  if(t.kind==='cardExpense'){if(t.account==='pichincha')p-=n;else a-=n;expense+=n;}
+  if(t.kind==='cashExpense'){c-=n;expense+=n;}
+ });
+ let mi=0,me=0,mex=0;
+ monthTx().forEach(t=>{const n=Number(t.amount)||0;if(['income','deposit'].includes(t.kind))mi+=n;if(['cardExpense','cashExpense'].includes(t.kind))me+=n;if(t.kind==='external')mex+=n;});
+ return {p,a,c,net:p+a+c,income:mi,expense:me,external:mex};
+}
+function categorySpent(cat){return monthTx().filter(t=>(t.kind==='cardExpense'||t.kind==='cashExpense')&&t.category===cat).reduce((s,t)=>s+Number(t.amount),0);}
+function labelKind(t){
+ const map={income:'Ingreso nuevo',deposit:'Depósito de dinero nuevo',withdrawal:'Retiro de efectivo',internal:'Transferencia entre mis cuentas',external:'Transferencia externa',cardExpense:'Compra con tarjeta',cashExpense:'Consumo en efectivo'};
+ return map[t.kind]||'Movimiento';
+}
+function accountName(v){return v==='atuntaqui'?'Cooperativa Atuntaqui':v==='cash'?'Efectivo':'Banco Pichincha';}
+function iconKind(k){return ({income:'↙',deposit:'＋',withdrawal:'⇩',internal:'⇄',external:'⇢',cardExpense:'💳',cashExpense:'💵'})[k]||'•';}
+function render(){
+ const t=totals();
+ $('netWorth').textContent=money(t.net);$('bankTotal').textContent=money(t.p+t.a);$('cashTotal').textContent=money(t.c);$('monthExpenses').textContent=money(t.expense);
+ $('incomeMetric').textContent=money(t.income);$('expenseMetric').textContent=money(t.expense);$('externalMetric').textContent=money(t.external);
+ $('remainingMetric').textContent=money(Number(state.budget)-t.expense);$('remainingMetric').className=Number(state.budget)-t.expense<0?'red':'green';
+ $('pichinchaBalance').textContent=money(t.p);$('atuntaquiBalance').textContent=money(t.a);$('cashBalance').textContent=money(t.c);
+ $('budgetBalance').textContent=money(state.budget);$('generalBudget').value=state.budget;
+ $('budgetCaption').textContent=`Consumido: ${money(t.expense)} de ${money(state.budget)}`;
+ renderBudgets();renderTransactions();save();
+}
+function renderBudgets(){
+ const box=$('budgetList');box.innerHTML='';
+ categories.forEach(([key])=>{
+  const limit=Number(state.categoryBudgets[key])||0,spent=categorySpent(key);
+  const pct=limit>0?Math.min(100,spent/limit*100):0;
+  const item=document.createElement('div');item.className='budget-item';
+  const title=document.createElement('div');title.className='budget-title';
+  const left=document.createElement('b');left.textContent=key;
+  const right=document.createElement('span');right.textContent=limit>0?`${money(spent)} / ${money(limit)}`:`${money(spent)} · sin límite`;
+  title.append(left,right);
+  const track=document.createElement('div');track.className='track';const fill=document.createElement('div');fill.className='fill'+(limit>0&&spent>limit?' over':'');fill.style.width=pct+'%';track.append(fill);
+  item.append(title,track);box.append(item);
+ });
+ const inputs=$('categoryBudgets');inputs.innerHTML='';
+ categories.forEach(([key])=>{
+  const wrap=document.createElement('div');wrap.className='field';
+  const lab=document.createElement('label');lab.textContent=key;
+  const inp=document.createElement('input');inp.type='number';inp.min='0';inp.step='.01';inp.dataset.category=key;inp.value=Number(state.categoryBudgets[key])||0;
+  wrap.append(lab,inp);inputs.append(wrap);
+ });
+}
+function renderTransactions(){
+ const list=$('transactionList');list.innerHTML='';
+ const q=$('search').value.toLowerCase(),type=$('filterType').value,month=$('filterMonth').value;
+ const filtered=state.transactions.filter(t=>(type==='all'||t.kind===type)&&(!month||monthKey(t.date)===month)&&(`${labelKind(t)} ${t.description||''} ${t.beneficiary||''} ${t.reason||''} ${t.category||''}`).toLowerCase().includes(q));
+ if(!filtered.length){list.innerHTML='<div class="empty">No hay movimientos que coincidan con el filtro.</div>';return;}
+ filtered.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(t=>{
+  const row=document.createElement('div');row.className='tx';
+  const left=document.createElement('div');left.className='tx-left';
+  const ico=document.createElement('div');ico.className='tx-icon';ico.textContent=iconKind(t.kind);
+  const info=document.createElement('div');info.style.minWidth='0';
+  const title=document.createElement('div');title.className='tx-title';title.textContent=t.description||labelKind(t);
+  const meta=document.createElement('div');meta.className='tx-meta';
+  let details=[labelKind(t),t.date, t.category, t.beneficiary, t.reason].filter(Boolean);
+  if(t.kind==='internal')details.push(`${accountName(t.account)} → ${accountName(t.destination)}`);
+  else if(t.account)details.push(accountName(t.account));
+  meta.textContent=details.join(' · ');
+  info.append(title,meta);left.append(ico,info);
+  const right=document.createElement('div');right.className='tx-right';
+  const amount=document.createElement('div');amount.className='tx-amount';
+  const positive=['income','deposit'].includes(t.kind),negative=['withdrawal','external','cardExpense','cashExpense'].includes(t.kind);
+  amount.className+=' '+(positive?'green':negative?'red':'');amount.textContent=(positive?'+':negative?'−':'')+money(t.amount);
+  const actions=document.createElement('div');actions.className='tx-actions';
+  const edit=document.createElement('button');edit.className='mini edit';edit.textContent='Editar';edit.addEventListener('click',()=>editTransaction(t.id));
+  const del=document.createElement('button');del.className='mini delete';del.textContent='Eliminar';del.addEventListener('click',()=>deleteTransaction(t.id));
+  actions.append(edit,del);right.append(amount,actions);row.append(left,right);list.append(row);
+ });
+}
+function deleteTransaction(id){if(!confirm('¿Eliminar este movimiento? Los saldos y presupuestos se recalcularán.'))return;state.transactions=state.transactions.filter(t=>t.id!==id);render();}
+function setupForm(){
+ const kind=$('kind').value;
+ ['destinationField','categoryField','sourceField','beneficiaryField','reasonField'].forEach(id=>$(id).classList.add('hidden'));
+ $('accountField').classList.remove('hidden');
+ let note='';
+ if(kind==='income'||kind==='deposit'){
+  $('sourceField').classList.remove('hidden');note='El dinero nuevo aumenta el saldo de la cuenta y se registra como ingreso del mes. No uses esta opción para mover dinero que ya estaba contado en tu efectivo.';
+ }else if(kind==='withdrawal'){
+  note='El retiro baja el saldo bancario y aumenta tu billetera de efectivo. No se cuenta como gasto hasta que registres el consumo.';
+ }else if(kind==='internal'){
+  $('destinationField').classList.remove('hidden');note='La transferencia entre tus propias cuentas no es ingreso ni gasto. Solo mueve el saldo de una cuenta a otra.';
+ }else if(kind==='external'){
+  $('beneficiaryField').classList.remove('hidden');$('reasonField').classList.remove('hidden');note='Se descuenta de la cuenta de origen y queda registrada con beneficiario y motivo. No se suma automáticamente al presupuesto de consumo.';
+ }else if(kind==='cardExpense'){
+  $('categoryField').classList.remove('hidden');note='La compra reduce el saldo de la cuenta seleccionada y se suma al gasto mensual de la categoría.';
+ }else if(kind==='cashExpense'){
+  $('accountField').classList.add('hidden');$('categoryField').classList.remove('hidden');note='El consumo reduce tu billetera de efectivo y se suma al presupuesto de la categoría.';
+ }
+ $('formNotice').textContent=note;
+}
+function populateCategories(){const s=$('category');s.innerHTML='';categories.forEach(([key,label])=>{const o=document.createElement('option');o.value=key;o.textContent=label;s.append(o);});}
+$('kind').addEventListener('change',setupForm);
+$('movementForm').addEventListener('reset',()=>setTimeout(setupForm,0));
+function editTransaction(id){
+ const tx=state.transactions.find(t=>t.id===id);if(!tx)return;
+ editingId=id;
+ $('kind').value=tx.kind;setupForm();
+ $('amount').value=tx.amount;$('date').value=tx.date||today();
+ $('description').value=tx.description||'';
+ if(tx.account)$('account').value=tx.account;
+ if(tx.destination)$('destination').value=tx.destination;
+ if(tx.category)$('category').value=tx.category;
+ if(tx.source)$('source').value=tx.source;
+ if(tx.beneficiary)$('beneficiary').value=tx.beneficiary;
+ if(tx.reason)$('reason').value=tx.reason;
+ $('submitMovement').textContent='Guardar cambios';
+ $('cancelEdit').style.display='inline-block';
+ $('movementPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function clearEditing(){
+ editingId=null;
+ $('submitMovement').textContent='Guardar movimiento';
+ $('cancelEdit').style.display='none';
+ $('movementForm').reset();$('date').value=today();setupForm();
+}
+$('cancelEdit').addEventListener('click',clearEditing);
+$('movementForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const kind=$('kind').value,amount=Number($('amount').value),date=$('date').value,account=$('account').value;
+ if(!Number.isFinite(amount)||amount<=0||!date){alert('Revisa el monto y la fecha.');return;}
+ const tx={id:editingId||crypto.randomUUID(),kind,amount,date,description:$('description').value.trim()};
+ if(['income','deposit','withdrawal','internal','external','cardExpense'].includes(kind))tx.account=account;
+ if(kind==='income'||kind==='deposit')tx.source=$('source').value;
+ if(kind==='internal'){tx.destination=$('destination').value;if(tx.destination===account){alert('La cuenta de origen y destino deben ser diferentes.');return;}}
+ if(kind==='external'){tx.beneficiary=$('beneficiary').value.trim();tx.reason=$('reason').value.trim();if(!tx.beneficiary||!tx.reason){alert('Indica el banco o beneficiario y el motivo.');return;}}
+ if(kind==='cardExpense'||kind==='cashExpense')tx.category=$('category').value;
+ const original=state.transactions;
+ if(editingId)state.transactions=original.filter(x=>x.id!==editingId);
+ const current=totals();
+ const available=(account==='pichincha'?current.p:current.a);
+ let error='';
+ if(kind==='withdrawal'&&amount>available)error='El retiro supera el saldo disponible de esa cuenta.';
+ if(kind==='internal'&&amount>available)error='La transferencia supera el saldo disponible.';
+ if(kind==='external'&&amount>available)error='La transferencia supera el saldo disponible.';
+ if(kind==='cardExpense'&&amount>available)error='La compra supera el saldo disponible de esa cuenta.';
+ if(kind==='cashExpense'&&amount>current.c)error='No tienes suficiente efectivo registrado en tu billetera.';
+ if(error){state.transactions=original;alert(error);return;}
+ if(editingId)state.transactions=original.map(x=>x.id===editingId?tx:x);
+ else state.transactions=[...original,tx];
+ clearEditing();render();
+});
+$('saveBudget').addEventListener('click',()=>{const n=Number($('generalBudget').value);if(!Number.isFinite(n)||n<=0){alert('Ingresa un presupuesto mayor que cero.');return;}state.budget=n;render();});
+$('saveCategoryBudgets').addEventListener('click',()=>{document.querySelectorAll('[data-category]').forEach(i=>{const n=Number(i.value);if(Number.isFinite(n)&&n>=0)state.categoryBudgets[i.dataset.category]=n;});render();});
+$('search').addEventListener('input',renderTransactions);$('filterType').addEventListener('change',renderTransactions);$('filterMonth').addEventListener('change',renderTransactions);
+function download(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
+$('exportBtn').addEventListener('click',()=>{
+ const rows=[['Fecha','Tipo','Monto','Cuenta','Destino','Categoría','Beneficiario','Motivo','Descripción'],...state.transactions.map(t=>[t.date,labelKind(t),t.amount,accountName(t.account),t.destination?accountName(t.destination):'',t.category||'',t.beneficiary||'',t.reason||'',t.description||''])];
+ const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\n');
+ download('movimientos_financieros.csv','\ufeff'+csv,'text/csv;charset=utf-8');
+});
+$('backupBtn').addEventListener('click',()=>download('respaldo_finanzas_pro_3.json',JSON.stringify(state,null,2),'application/json'));
+$('restoreFile').addEventListener('change',async e=>{
+ const file=e.target.files[0];if(!file)return;
+ try{const data=JSON.parse(await file.text());if(!data.accounts||!Array.isArray(data.transactions))throw new Error('Formato no válido');if(!confirm('Importar reemplazará los datos actuales de esta aplicación. ¿Continuar?'))return;state={...structuredClone(defaultState),...data,accounts:{...defaultState.accounts,...data.accounts}};render();alert('Respaldo importado correctamente.');}catch(err){alert('No se pudo importar el archivo: '+err.message);}finally{e.target.value='';}
+});
+
+// Sincronización privada opcional con Supabase.
+// La tabla aplica RLS: cada usuario solo puede leer y modificar sus propios datos.
+let cloudClient=null,cloudUser=null,cloudTimer=null,cloudBusy=false;
+function cloudMessage(msg,kind=''){
+ const el=$('syncStatus');if(!el)return;el.textContent=msg;el.className='sync-status '+kind;
+}
+function readCloudConfig(){
+ return {url:$('supabaseUrl').value.trim(),key:$('supabaseKey').value.trim()};
+}
+function saveCloudConfig(){
+ const c=readCloudConfig();
+ if(!c.url||!c.key){cloudMessage('Completa la URL y la clave pública de Supabase.','err');return false;}
+ try{new URL(c.url);}catch{cloudMessage('La URL del proyecto no es válida.','err');return false;}
+ localStorage.setItem('finanzas_pro_cloud_config',JSON.stringify(c));
+ cloudClient=window.supabase.createClient(c.url,c.key);
+ cloudMessage('Configuración guardada en este navegador. Ahora inicia sesión.','ok');
+ return true;
+}
+function scheduleCloudSave(){
+ if(!cloudUser||!cloudClient)return;
+ clearTimeout(cloudTimer);
+ cloudTimer=setTimeout(()=>pushCloudState(),1200);
+}
+async function pushCloudState(){
+ if(!cloudUser||!cloudClient||cloudBusy)return;
+ cloudBusy=true;cloudMessage('Guardando cambios en la nube…');
+ try{
+  const {error}=await cloudClient.from('user_finances').upsert(
+   {user_id:cloudUser.id,data:state,updated_at:new Date().toISOString()},
+   {onConflict:'user_id'}
+  );
+  if(error)throw error;
+  cloudMessage('Sincronizado. Tus cambios están guardados en la nube.','ok');
+ }catch(err){cloudMessage('No se pudo sincronizar: '+(err.message||'revisa tu conexión y la tabla SQL.'),'err');}
+ finally{cloudBusy=false;}
+}
+async function pullCloudState(){
+ if(!cloudUser||!cloudClient)return;
+ cloudMessage('Buscando tus datos en la nube…');
+ try{
+  const {data,error}=await cloudClient.from('user_finances').select('data').eq('user_id',cloudUser.id).maybeSingle();
+  if(error)throw error;
+  if(data&&data.data&&Array.isArray(data.data.transactions)){
+   if(confirm('Se encontró una copia en la nube. ¿Quieres cargarla en este dispositivo? Se reemplazarán los datos locales actuales. Descarga un respaldo antes si deseas conservarlos.')){
+    state={...structuredClone(defaultState),...data.data,accounts:{...defaultState.accounts,...data.data.accounts},categoryBudgets:{...defaultState.categoryBudgets,...data.data.categoryBudgets}};
+    render();
+   }
+  }else{
+   await pushCloudState();
+  }
+  cloudMessage('Conectado como '+cloudUser.email+'.','ok');
+ }catch(err){cloudMessage('Error al cargar datos: '+(err.message||'comprueba la configuración SQL.'));}
+}
+async function connectCloud(){
+ if(!cloudClient&&!saveCloudConfig())return;
+ const email=$('syncEmail').value.trim(),password=$('syncPassword').value;
+ if(!email||!password){cloudMessage('Escribe tu correo y contraseña.','err');return;}
+ cloudMessage('Conectando…');
+ try{
+  let result=await cloudClient.auth.signInWithPassword({email,password});
+  if(result.error){
+   // Si no existe la cuenta, se intenta registrarla. Si requiere confirmación,
+   // Supabase indicará al usuario que revise su correo.
+   const signup=await cloudClient.auth.signUp({email,password});
+   if(signup.error)throw signup.error;
+   if(!signup.data.session){
+    cloudMessage('Cuenta creada. Confirma tu correo y luego vuelve a iniciar sesión.','ok');return;
+   }
+   result=signup;
+  }
+  cloudUser=result.data.user;
+  await pullCloudState();
+ }catch(err){cloudMessage('No se pudo iniciar sesión: '+(err.message||'revisa correo y contraseña.'),'err');}
+}
+async function disconnectCloud(){
+ if(cloudClient)await cloudClient.auth.signOut();
+ cloudUser=null;cloudMessage('Sesión cerrada. Los datos locales siguen disponibles.');
+}
+$('saveCloudConfig').addEventListener('click',saveCloudConfig);
+$('connectCloud').addEventListener('click',connectCloud);
+$('syncNow').addEventListener('click',pushCloudState);
+$('disconnectCloud').addEventListener('click',disconnectCloud);
+try{
+ const saved=JSON.parse(localStorage.getItem('finanzas_pro_cloud_config')||'null');
+ if(saved){$('supabaseUrl').value=saved.url||'';$('supabaseKey').value=saved.key||'';cloudClient=window.supabase.createClient(saved.url,saved.key);}
+}catch(e){console.warn('No se pudo cargar la configuración de sincronización',e);}
+window.addEventListener('online',()=>{if(cloudUser)pushCloudState();});
+
+populateCategories();setupForm();render();
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js').catch(err=>console.warn('PWA:',err));
+</script>
+</body>
+</html>
