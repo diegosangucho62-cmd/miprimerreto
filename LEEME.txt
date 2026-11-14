@@ -1,31 +1,50 @@
-CONTROL FINANCIERO PRO 3.1 — ANDROID Y SINCRONIZACIÓN
+CONTROL FINANCIERO PRO 3.2 — SINCRONIZACIÓN AUTOMÁTICA
 
 CONTENIDO
-- index.html: aplicación.
+- index.html: aplicación actualizada.
 - manifest.webmanifest, service-worker.js e icon.svg: instalación PWA.
-- supabase_setup.sql: tabla privada para sincronización.
+- supabase_setup.sql: tabla privada y activación de Realtime.
 
-1) PROBAR EN COMPUTADORA
-Abre index.html en un navegador moderno. La edición de movimientos y el almacenamiento local funcionan sin configurar la nube.
+1) ACTUALIZAR LA CONFIGURACIÓN DE SUPABASE
+1. Entra a tu proyecto de Supabase y abre SQL Editor.
+2. Ejecuta TODO el archivo supabase_setup.sql incluido en esta carpeta.
+   Esto crea/actualiza la tabla, mantiene las políticas RLS y agrega user_finances
+   a la publicación supabase_realtime para recibir cambios en tiempo real.
+3. Publica la carpeta completa en el mismo alojamiento HTTPS donde usas la app.
+   Reemplaza los archivos de la versión anterior por los de esta versión.
 
-2) INSTALAR EN ANDROID
-La instalación PWA requiere publicar esta carpeta en un sitio HTTPS (por ejemplo, Netlify o GitHub Pages).
-Luego, abre la dirección HTTPS en Chrome para Android, abre el menú ⋮ y elige "Instalar aplicación" o "Añadir a pantalla de inicio".
-No basta con enviar el archivo HTML por WhatsApp: el service worker y la instalación PWA requieren HTTPS o localhost.
+2) CONECTAR CELULAR Y COMPUTADORA
+1. Abre la aplicación en la computadora y en Chrome de Android.
+2. En ambos dispositivos, entra en “Sincronización entre dispositivos”.
+3. Comprueba que la URL y la clave pública de Supabase sean las mismas.
+4. Inicia sesión en ambos con el mismo correo y contraseña.
+5. Si aparece una copia en la nube, decide si cargarla. Antes, descarga un
+   respaldo JSON en el dispositivo para conservar sus datos locales.
+6. Deja la aplicación abierta y con internet. Al guardar un movimiento en un
+   dispositivo, el otro debe recibir el cambio automáticamente.
 
-3) ACTIVAR SINCRONIZACIÓN PRIVADA CON SUPABASE
-A. Crea un proyecto en Supabase.
-B. En Supabase > SQL Editor, ejecuta el contenido de supabase_setup.sql.
-C. En Project Settings > API, copia Project URL y la clave pública anon/publishable.
-D. Abre la aplicación y entra en "Sincronización entre dispositivos". Pega URL y clave pública, guarda configuración y crea/inicia sesión con correo y contraseña.
-E. Repite la configuración e inicia sesión con el mismo correo en Android y computadora.
-F. Cuando aparezca una copia en la nube, elige cargarla. Después, los cambios se sincronizan al guardar y también puedes pulsar "Sincronizar ahora".
+3) SI NO SE ACTUALIZA
+- Confirma que ejecutaste el SQL de esta versión.
+- En Supabase, revisa Database > Publications y confirma que
+  supabase_realtime incluye public.user_finances.
+- Verifica que ambos dispositivos usan el mismo proyecto Supabase y el mismo
+  usuario.
+- Comprueba que el navegador no esté bloqueando la conexión o la pestaña esté
+  suspendida. Al volver a abrir la app, la sesión guardada se recupera y consulta
+  la nube.
+- Usa “Sincronizar ahora” como alternativa manual.
 
-SEGURIDAD Y LÍMITES
-- La clave anon/publishable está diseñada para uso en cliente; nunca pegues la clave service_role ni una clave secreta.
-- La tabla tiene Row Level Security y cada usuario solo puede acceder a su propio registro.
-- No compartas tu contraseña.
-- Antes de cargar datos de la nube sobre un dispositivo, descarga un respaldo JSON del dispositivo si necesitas conservar su información.
-- La sincronización necesita internet. Sin conexión, la aplicación conserva los cambios localmente; al volver a estar en línea intenta subirlos.
-- Evita editar los mismos datos simultáneamente en dos dispositivos sin sincronizar. Esta versión usa el último guardado y no ofrece resolución avanzada de conflictos.
-- Los datos no se conectan automáticamente con Banco Pichincha ni Cooperativa Atuntaqui.
+SEGURIDAD Y PRECAUCIONES
+- Usa únicamente la clave pública anon/publishable. Nunca uses service_role ni
+  una clave secreta en el navegador.
+- RLS limita cada registro al usuario autenticado.
+- Antes de cargar una copia de la nube sobre datos locales, descarga un respaldo
+  JSON si quieres conservar esos datos.
+- Si llegan cambios remotos mientras tienes cambios locales pendientes, la app
+  te preguntará antes de reemplazar los datos locales.
+- Realtime requiere internet y una conexión activa. Si el navegador suspende la
+  pestaña, la actualización puede llegar al volver a abrirla.
+- Evita editar simultáneamente el mismo conjunto de datos desde ambos equipos.
+  La app pregunta ante cambios remotos concurrentes, pero no ofrece fusión campo
+  por campo ni historial de versiones.
+- No se conecta automáticamente con Banco Pichincha ni Cooperativa Atuntaqui.

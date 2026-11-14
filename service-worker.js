@@ -1,4 +1,4 @@
-const CACHE='control-financiero-pro-3-1-v1';
+const CACHE='control-financiero-pro-3-2-v1';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));

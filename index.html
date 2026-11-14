@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<title>Control Financiero Pro 3.1</title>
+<title>Control Financiero Pro 3.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -230,7 +230,7 @@ textarea{min-height:76px;resize:vertical}
       </section>
     </aside>
   </div>
-  <p class="footer-note">Control Financiero Pro 3.1 · Datos locales con sincronización privada opcional. No se conecta automáticamente con los bancos.</p>
+  <p class="footer-note">Control Financiero Pro 3.2 · Datos locales con sincronización privada opcional. No se conecta automáticamente con los bancos.</p>
 </div>
 
 <script>
@@ -268,7 +268,7 @@ function loadState(){
  }catch(e){console.warn('No se pudieron leer los datos guardados',e);}
  return structuredClone(defaultState);
 }
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(typeof scheduleCloudSave==='function')scheduleCloudSave();}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(typeof scheduleCloudSave==='function'&&!cloudApplyingRemote)scheduleCloudSave();}
 function monthKey(d){return (d||'').slice(0,7);}
 function currentMonth(){return today().slice(0,7);}
 function monthTx(){return state.transactions.filter(t=>monthKey(t.date)===currentMonth());}
@@ -440,58 +440,130 @@ $('restoreFile').addEventListener('change',async e=>{
  try{const data=JSON.parse(await file.text());if(!data.accounts||!Array.isArray(data.transactions))throw new Error('Formato no válido');if(!confirm('Importar reemplazará los datos actuales de esta aplicación. ¿Continuar?'))return;state={...structuredClone(defaultState),...data,accounts:{...defaultState.accounts,...data.accounts}};render();alert('Respaldo importado correctamente.');}catch(err){alert('No se pudo importar el archivo: '+err.message);}finally{e.target.value='';}
 });
 
-// Sincronización privada opcional con Supabase.
-// La tabla aplica RLS: cada usuario solo puede leer y modificar sus propios datos.
+// Sincronización privada entre dispositivos con Supabase.
+// Requiere la tabla user_finances con RLS y Realtime habilitado.
 let cloudClient=null,cloudUser=null,cloudTimer=null,cloudBusy=false;
+let cloudChannel=null,cloudLastWriteAt=0,cloudApplyingRemote=false,cloudPending=false;
+
 function cloudMessage(msg,kind=''){
- const el=$('syncStatus');if(!el)return;el.textContent=msg;el.className='sync-status '+kind;
+ const el=$('syncStatus');if(!el)return;
+ el.textContent=msg;el.className='sync-status '+kind;
 }
 function readCloudConfig(){
  return {url:$('supabaseUrl').value.trim(),key:$('supabaseKey').value.trim()};
 }
+function configureCloudClient(c){
+ if(!window.supabase||!window.supabase.createClient)throw new Error('No se pudo cargar Supabase. Revisa tu conexión a internet.');
+ if(cloudChannel){cloudClient.removeChannel(cloudChannel);cloudChannel=null;}
+ cloudClient=window.supabase.createClient(c.url,c.key,{
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+ });
+ return cloudClient;
+}
 function saveCloudConfig(){
  const c=readCloudConfig();
  if(!c.url||!c.key){cloudMessage('Completa la URL y la clave pública de Supabase.','err');return false;}
- try{new URL(c.url);}catch{cloudMessage('La URL del proyecto no es válida.','err');return false;}
- localStorage.setItem('finanzas_pro_cloud_config',JSON.stringify(c));
- cloudClient=window.supabase.createClient(c.url,c.key);
- cloudMessage('Configuración guardada en este navegador. Ahora inicia sesión.','ok');
- return true;
+ try{const u=new URL(c.url);if(!['https:'].includes(u.protocol))throw new Error();}
+ catch{cloudMessage('La URL debe ser válida y usar HTTPS.','err');return false;}
+ try{
+  localStorage.setItem('finanzas_pro_cloud_config',JSON.stringify(c));
+  configureCloudClient(c);
+  cloudMessage('Configuración guardada. Inicia sesión con tu misma cuenta en ambos dispositivos.','ok');
+  return true;
+ }catch(err){cloudMessage(err.message||'No se pudo configurar Supabase.','err');return false;}
 }
 function scheduleCloudSave(){
- if(!cloudUser||!cloudClient)return;
+ if(!cloudUser||!cloudClient||cloudApplyingRemote)return;
+ cloudPending=true;
  clearTimeout(cloudTimer);
- cloudTimer=setTimeout(()=>pushCloudState(),1200);
+ cloudTimer=setTimeout(()=>pushCloudState(),900);
 }
 async function pushCloudState(){
  if(!cloudUser||!cloudClient||cloudBusy)return;
- cloudBusy=true;cloudMessage('Guardando cambios en la nube…');
+ clearTimeout(cloudTimer);
+ cloudBusy=true;
+ const snapshot=structuredClone(state);
+ const stamp=new Date().toISOString();
+ cloudLastWriteAt=Date.parse(stamp); // Marca el guardado antes del eco de Realtime.
+ cloudMessage('Enviando cambios a la nube…');
  try{
   const {error}=await cloudClient.from('user_finances').upsert(
-   {user_id:cloudUser.id,data:state,updated_at:new Date().toISOString()},
+   {user_id:cloudUser.id,data:snapshot,updated_at:stamp},
    {onConflict:'user_id'}
   );
   if(error)throw error;
-  cloudMessage('Sincronizado. Tus cambios están guardados en la nube.','ok');
- }catch(err){cloudMessage('No se pudo sincronizar: '+(err.message||'revisa tu conexión y la tabla SQL.'),'err');}
- finally{cloudBusy=false;}
+  cloudPending=false;
+  cloudMessage('Sincronizado. Los demás dispositivos recibirán los cambios automáticamente.','ok');
+ }catch(err){
+  cloudPending=true;
+  cloudMessage('No se pudo sincronizar: '+(err.message||'revisa internet, SQL y permisos de Supabase.'),'err');
+ }finally{
+  cloudBusy=false;
+ }
+}
+function applyRemoteState(remoteData,remoteStamp,ask=true){
+ if(!remoteData||!Array.isArray(remoteData.transactions))return false;
+ if(ask&&!confirm('Hay datos más recientes en la nube. ¿Quieres cargarlos en este dispositivo? Si tienes información local que no está en la nube, descarga primero un respaldo JSON.'))return false;
+ cloudApplyingRemote=true;
+ clearTimeout(cloudTimer);
+ try{
+  state={...structuredClone(defaultState),...remoteData,
+   accounts:{...defaultState.accounts,...remoteData.accounts},
+   categoryBudgets:{...defaultState.categoryBudgets,...remoteData.categoryBudgets}};
+  render();
+  cloudLastWriteAt=Math.max(cloudLastWriteAt,Date.parse(remoteStamp)||0);
+  cloudPending=false;
+  return true;
+ }finally{cloudApplyingRemote=false;}
 }
 async function pullCloudState(){
  if(!cloudUser||!cloudClient)return;
- cloudMessage('Buscando tus datos en la nube…');
+ cloudMessage('Consultando los datos de la nube…');
  try{
-  const {data,error}=await cloudClient.from('user_finances').select('data').eq('user_id',cloudUser.id).maybeSingle();
+  const {data,error}=await cloudClient.from('user_finances').select('data,updated_at').eq('user_id',cloudUser.id).maybeSingle();
   if(error)throw error;
-  if(data&&data.data&&Array.isArray(data.data.transactions)){
-   if(confirm('Se encontró una copia en la nube. ¿Quieres cargarla en este dispositivo? Se reemplazarán los datos locales actuales. Descarga un respaldo antes si deseas conservarlos.')){
-    state={...structuredClone(defaultState),...data.data,accounts:{...defaultState.accounts,...data.data.accounts},categoryBudgets:{...defaultState.categoryBudgets,...data.data.categoryBudgets}};
-    render();
+  if(data&&data.data){
+   const remoteStamp=Date.parse(data.updated_at)||0;
+   if(remoteStamp>cloudLastWriteAt){
+    const loaded=applyRemoteState(data.data,data.updated_at,true);
+    if(!loaded)cloudMessage('Hay una copia en la nube. No se reemplazaron tus datos locales. Haz un respaldo antes de cargarla.','');
    }
-  }else{
+  }else if(!cloudPending){
    await pushCloudState();
   }
-  cloudMessage('Conectado como '+cloudUser.email+'.','ok');
- }catch(err){cloudMessage('Error al cargar datos: '+(err.message||'comprueba la configuración SQL.'));}
+  cloudMessage('Conectado como '+cloudUser.email+'. Sincronización automática activa.','ok');
+ }catch(err){cloudMessage('Error al consultar la nube: '+(err.message||'comprueba la tabla y la conexión.'));}
+}
+function subscribeToCloud(){
+ if(!cloudClient||!cloudUser)return;
+ if(cloudChannel)cloudClient.removeChannel(cloudChannel);
+ cloudChannel=cloudClient.channel('finanzas-'+cloudUser.id)
+  .on('postgres_changes',{
+   event:'*',schema:'public',table:'user_finances',
+   filter:'user_id=eq.'+cloudUser.id
+  },payload=>{
+   const row=payload.new;
+   if(!row||!row.data)return;
+   const remoteStamp=Date.parse(row.updated_at)||0;
+   if(remoteStamp<=cloudLastWriteAt)return; // Ignora el eco del propio guardado.
+   if(cloudPending||cloudBusy){
+    const replace=confirm('Llegaron cambios de otro dispositivo mientras tienes cambios locales pendientes. ¿Quieres reemplazar los datos locales con la versión más reciente de la nube? Descarga un respaldo si necesitas conservar ambos.');
+    if(!replace){cloudMessage('Hay cambios de otro dispositivo pendientes. Conserva un respaldo y decide qué versión mantener.','err');return;}
+   }
+   if(applyRemoteState(row.data,row.updated_at,false)){
+    cloudMessage('Actualizado automáticamente desde otro dispositivo.','ok');
+   }
+  })
+  .subscribe(status=>{
+   if(status==='SUBSCRIBED')cloudMessage('Conectado como '+cloudUser.email+'. Escuchando cambios en tiempo real.','ok');
+   else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')cloudMessage('No se pudo activar tiempo real. Revisa que user_finances esté en la publicación supabase_realtime.','err');
+  });
+}
+async function activateCloudSession(session,load=true){
+ if(!session||!session.user||!cloudClient)return;
+ cloudUser=session.user;
+ subscribeToCloud();
+ if(load)await pullCloudState();
 }
 async function connectCloud(){
  if(!cloudClient&&!saveCloudConfig())return;
@@ -501,34 +573,45 @@ async function connectCloud(){
  try{
   let result=await cloudClient.auth.signInWithPassword({email,password});
   if(result.error){
-   // Si no existe la cuenta, se intenta registrarla. Si requiere confirmación,
-   // Supabase indicará al usuario que revise su correo.
+   // Solo intenta crear la cuenta si el usuario aún no existe.
    const signup=await cloudClient.auth.signUp({email,password});
-   if(signup.error)throw signup.error;
+   if(signup.error)throw result.error;
    if(!signup.data.session){
-    cloudMessage('Cuenta creada. Confirma tu correo y luego vuelve a iniciar sesión.','ok');return;
+    cloudMessage('Cuenta creada. Confirma tu correo y vuelve a iniciar sesión.','ok');return;
    }
    result=signup;
   }
-  cloudUser=result.data.user;
-  await pullCloudState();
+  await activateCloudSession(result.data.session||{user:result.data.user},true);
  }catch(err){cloudMessage('No se pudo iniciar sesión: '+(err.message||'revisa correo y contraseña.'),'err');}
 }
 async function disconnectCloud(){
+ if(cloudChannel&&cloudClient){await cloudClient.removeChannel(cloudChannel);cloudChannel=null;}
  if(cloudClient)await cloudClient.auth.signOut();
- cloudUser=null;cloudMessage('Sesión cerrada. Los datos locales siguen disponibles.');
+ cloudUser=null;cloudPending=false;
+ cloudMessage('Sesión cerrada. Los datos locales siguen disponibles.');
 }
 $('saveCloudConfig').addEventListener('click',saveCloudConfig);
 $('connectCloud').addEventListener('click',connectCloud);
 $('syncNow').addEventListener('click',pushCloudState);
 $('disconnectCloud').addEventListener('click',disconnectCloud);
-try{
- const saved=JSON.parse(localStorage.getItem('finanzas_pro_cloud_config')||'null');
- if(saved){$('supabaseUrl').value=saved.url||'';$('supabaseKey').value=saved.key||'';cloudClient=window.supabase.createClient(saved.url,saved.key);}
-}catch(e){console.warn('No se pudo cargar la configuración de sincronización',e);}
+
+async function restoreCloudSession(){
+ try{
+  const saved=JSON.parse(localStorage.getItem('finanzas_pro_cloud_config')||'null');
+  if(!saved)return;
+  $('supabaseUrl').value=saved.url||'';
+  $('supabaseKey').value=saved.key||'';
+  configureCloudClient(saved);
+  const {data,error}=await cloudClient.auth.getSession();
+  if(error)throw error;
+  if(data.session)await activateCloudSession(data.session,true);
+ }catch(err){cloudMessage('No se pudo restaurar la sesión: '+(err.message||'inicia sesión nuevamente.'),'err');}
+}
 window.addEventListener('online',()=>{if(cloudUser)pushCloudState();});
+window.addEventListener('beforeunload',()=>{if(cloudTimer&&cloudUser)pushCloudState();});
 
 populateCategories();setupForm();render();
+restoreCloudSession();
 if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js').catch(err=>console.warn('PWA:',err));
 </script>
 </body>
